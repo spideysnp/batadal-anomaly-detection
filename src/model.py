@@ -18,10 +18,17 @@ def score(model: IsolationForest, X) -> np.ndarray:
     return -model.score_samples(X)
 
 
-def pick_threshold(normal_scores, tune_scores, tune_labels) -> float:
-    """Return the threshold with the highest BATADAL score on the tuning data."""
+def pick_threshold(
+    normal_scores,
+    tune_scores,
+    tune_labels,
+    max_false_alarm: float = 0.1,
+) -> float:
+    """Return the best scoring threshold within the false alarm budget."""
 
-    candidates = np.quantile(normal_scores, np.linspace(0.90, 0.999, 50))
+    candidates = np.quantile(
+        normal_scores, np.linspace(1 - max_false_alarm, 0.999, 100)
+    )
 
     best_threshold = float(candidates[0])
     best_s = -1.0
@@ -34,4 +41,4 @@ def pick_threshold(normal_scores, tune_scores, tune_labels) -> float:
             best_s = s
             best_threshold = float(threshold)
 
-    return best_threshold 
+    return best_threshold
