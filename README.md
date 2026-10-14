@@ -1,4 +1,4 @@
-# batadal-anomaly-detection
+# Detecting Cyber Attacks on a Water Distribution Network
 
 Attack detection on BATADAL water distribution SCADA data. The project trains an isolation forest on normal operation only, tunes the alarm threshold on labeled attacks, and scores the detector with the official BATADAL metric S.
 
