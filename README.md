@@ -1,4 +1,4 @@
-# Detecting Cyber Attacks on a Water Distribution Network
+# SCADA Attack Detection on a Water Distribution Network
 
 Attack detection on BATADAL water distribution SCADA data. The project trains an isolation forest on normal operation only, tunes the alarm threshold on labeled attacks, and scores the detector with the official BATADAL metric S.
 
@@ -38,15 +38,17 @@ The test file does not include labels. `labels/test_attacks.csv` transcribes the
 
 ## Run
 
-pandas 3.0.6 requires Python 3.11 or later. Run every command from the repo root. `app.py` reads relative paths such as `data/train_normal.csv`, and `python -m pytest` places the repo root on the import path so `from src.evaluate import batadal_score` resolves.
+pandas 3.0.6 requires Python 3.11 or later. Run every command from the repo root. `python -m pytest` places the repo root on the import path so `from src.evaluate import batadal_score` resolves.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 python -m pytest
 streamlit run app.py
 ```
+
+`requirements.txt` lists the packages for the dashboard only. `requirements-dev.txt` adds `pytest` for the test suite and `ipykernel` for `eda.ipynb`.
 
 ## Method
 
@@ -61,8 +63,8 @@ streamlit run app.py
 
 | Detector | Data | Attacks detected | S | TPR | TNR |
 |---|---|---|---|---|---|
-| Flag every hour | Tuning | 7 / 7 | 0.750 | 1.00 | 0.00 |
-| v0.1 isolation forest | Tuning | | 0.740 | 0.32 | 0.88 |
+| Flag every hour | Tuning | 5 / 5 labeled | 0.750 | 1.00 | 0.00 |
+| v0.1 isolation forest | Tuning | 5 / 5 labeled | 0.740 | 0.32 | 0.88 |
 | Flag every hour | Test | 7 / 7 | 0.750 | 1.00 | 0.00 |
 | **v0.1 isolation forest** | **Test** | **7 / 7** | **0.702** | **0.16** | **0.90** |
 | Brentan et al., published | Test | 6 / 7 | 0.894 | | |
@@ -70,7 +72,7 @@ streamlit run app.py
 
 The test false alarm rate equals 10.3%. `batadal_score` reproduces the published Brentan et al. score of 0.894 from `data/reports/brentan.csv`. The match verifies the scorer against the [official results](https://www.batadal.net/results.html).
 
-`src/evaluate.py::detection_delays` measures each delay as the hours between the attack start and the first flag inside the attack window.
+`src/evaluate.py::detection_delays` measures each delay as the hours between the attack start and the first flag inside the attack window. The dashboard shows the same table below the chart.
 
 | Attack | Targeted components | Duration in hours | Hours to first flag |
 |---|---|---|---|
@@ -85,7 +87,7 @@ The test false alarm rate equals 10.3%. `batadal_score` reproduces the published
 ## Findings
 
 - S weights early detection and classification equally. A detector that flags every hour therefore scores 0.750. v0.1 scores below the reference on both the tuning file and the test file.
-- Background alarms explain most fast detections. Seven columns stay constant across `data/train_normal.csv`: `S_PU1`, `F_PU3`, `S_PU3`, `F_PU5`, `S_PU5`, `F_PU9`, and `S_PU9`. The isolation forest cannot split on a constant column, so the model cannot detect attacks 10 and 11 on pump PU3. The detector still flags both attacks within one hour. A 10% alarm rate produces a random flag within about 9 hours of any attack start, so chance accounts for both detections. The author identified the PU3 blind spot after reading the published test attack list.
+- Background alarms likely explain most fast detections. Seven columns stay constant across `data/train_normal.csv`: `S_PU1`, `F_PU3`, `S_PU3`, `F_PU5`, `S_PU5`, `F_PU9`, and `S_PU9`. The isolation forest cannot split on the PU3 columns, so the model cannot see the pump itself switch on during attacks 10 and 11. The detector flagged both attacks within one hour. At a 10% alarm rate, a random flag arrives about 9 hours after any start on average, so chance likely explains both detections. The author identified the PU3 blind spot after reading the published test attack list.
 - The model scores each hour independently. Replay concealment makes each attacked hour resemble normal operation, so a single hour view misses concealed attacks.
 - `src/features.py::add_time_features` adds hourly change, 24 hour rolling deviation, and hour of day. The time context features lowered tuning S from 0.740 to 0.732 at the same budget. The project did not adopt the features for v0.1, and the 0.008 gap may fall within seed variation.
 
@@ -99,19 +101,22 @@ The test false alarm rate equals 10.3%. `batadal_score` reproduces the published
 ## Project layout
 
 ```
-app.py            Streamlit dashboard; runs the full pipeline
-src/data.py       CSV loading, feature selection, label mapping
-src/model.py      isolation forest fit, scoring, threshold search
-src/evaluate.py   attack windows, delays, TPR and TNR, score S, report parsing
-src/features.py   experimental time context features; app.py does not use the module
-tests/            metric and scorer tests
-eda.ipynb         data checks, tuning, and the single test run
-labels/           transcribed test attack list
-docs/             dashboard screenshot and published test attack list
+app.py                Streamlit dashboard; runs the full pipeline
+src/data.py           CSV loading, feature selection, label mapping
+src/model.py          isolation forest fit, scoring, threshold search
+src/evaluate.py       attack windows, delays, TPR and TNR, score S, report parsing
+src/features.py       experimental time context features; app.py does not use the module
+tests/                metric, scorer, and threshold budget tests
+eda.ipynb             data checks, tuning, and the single test run
+labels/               transcribed test attack list
+docs/                 dashboard screenshot and published test attack list
+requirements.txt      dashboard dependencies
+requirements-dev.txt  test and notebook dependencies
 ```
 
 ## Next
 
+- A tie rule in `pick_threshold` that prefers the higher threshold
 - A rule that flags any change in a column constant during training
 - A normal split held out from training for the false alarm budget
 - Feature family comparisons across several seeds
