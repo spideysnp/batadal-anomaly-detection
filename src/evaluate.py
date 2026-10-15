@@ -1,8 +1,12 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
+Labels = list[int] | pd.Series | np.ndarray
 
-def attack_windows(y_true: list[int] | pd.Series) -> list[tuple[int, int]]:
+
+def attack_windows(y_true: Labels) -> list[tuple[int, int]]:
     """Return (start, end) positions of each run of 1s, both ends inclusive."""
 
     runs = []
@@ -22,10 +26,7 @@ def attack_windows(y_true: list[int] | pd.Series) -> list[tuple[int, int]]:
     return runs
 
 
-def detection_delays(
-    y_true: list[int] | pd.Series,
-    y_pred: list[int] | pd.Series,
-) -> list[int | None]:
+def detection_delays(y_true: Labels, y_pred: Labels) -> list[int | None]:
     """Return hours to first detection per attack window, None if missed."""
 
     y_true = list(y_true)
@@ -43,7 +44,7 @@ def detection_delays(
     return delays
 
 
-def pointwise_metrics(y_true, y_pred) -> dict[str, float]:
+def pointwise_metrics(y_true: Labels, y_pred: Labels) -> dict[str, float]:
     """Return true positive rate and true negative rate."""
 
     y_true = np.asarray(y_true)
@@ -60,10 +61,17 @@ def pointwise_metrics(y_true, y_pred) -> dict[str, float]:
     return {"tpr": tpr, "tnr": tnr}
 
 
-def batadal_score(y_true, y_pred, gamma: float = 0.5) -> dict[str, float]:
+def batadal_score(
+    y_true: Labels,
+    y_pred: Labels,
+    gamma: float = 0.5,
+) -> dict[str, float]:
     """Return S_TTD, S_CM, and the combined BATADAL score S."""
 
     windows = attack_windows(y_true)
+    if not windows:
+        raise ValueError("y_true contains no attack windows")
+
     delays = detection_delays(y_true, y_pred)
 
     ratios = [
@@ -80,7 +88,7 @@ def batadal_score(y_true, y_pred, gamma: float = 0.5) -> dict[str, float]:
     return {"s_ttd": s_ttd, "s_cm": s_cm, "s": s}
 
 
-def report_to_flags(report_path: str, index: pd.DatetimeIndex) -> pd.Series:
+def report_to_flags(report_path: str | Path, index: pd.DatetimeIndex) -> pd.Series:
     """Return an hourly 0/1 track for the events in a BATADAL report."""
 
     report = pd.read_csv(

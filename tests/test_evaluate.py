@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 from src.evaluate import (
@@ -5,6 +6,7 @@ from src.evaluate import (
     batadal_score,
     detection_delays,
     pointwise_metrics,
+    report_to_flags,
 )
 
 
@@ -62,3 +64,18 @@ def test_missed_attack_scores_zero_ttd():
     assert result["s_ttd"] == 0.0
     assert result["s_cm"] == pytest.approx(0.5)
     assert result["s"] == pytest.approx(0.25)
+
+
+def test_score_without_attacks_raises():
+    with pytest.raises(ValueError):
+        batadal_score([0, 0], [0, 0])
+
+
+def test_report_to_flags_includes_both_endpoints(tmp_path):
+    report = tmp_path / "report.csv"
+    report.write_text("1, 01-01-2017 02, 01-01-2017 04, T1\n")
+    index = pd.date_range("2017-01-01", periods=6, freq="h")
+
+    flags = report_to_flags(report, index)
+
+    assert flags.tolist() == [0, 0, 1, 1, 1, 0]
