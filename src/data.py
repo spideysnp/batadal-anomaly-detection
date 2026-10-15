@@ -1,7 +1,9 @@
+from pathlib import Path
+
 import pandas as pd
 
 
-def load_csv(file_path: str) -> pd.DataFrame:
+def load_csv(file_path: str | Path) -> pd.DataFrame:
     """Load a BATADAL CSV indexed by hourly DATETIME."""
 
     df = pd.read_csv(file_path)
@@ -19,7 +21,11 @@ def get_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_labels(df: pd.DataFrame) -> pd.Series:
-    """Return 1 for attack hours, 0 otherwise."""
+    """Return 1 where ATT_FLAG equals 1.
+
+    Training Dataset 2 marks unlabeled hours with ATT_FLAG of -999. Those hours
+    map to 0, so unlabeled attack hours count as normal during tuning.
+    """
 
     is_attack = (df["ATT_FLAG"] == 1).astype(int)
 
